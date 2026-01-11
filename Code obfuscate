@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -35,6 +35,249 @@
       height: 140px;
       resize: vertical;
     }
+    button {
+      background: #6366f1;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #4f46e5;
+    }
+    pre {
+      background: #111827;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .section {
+      margin: 30px 0;
+    }
+    .label {
+      font-weight: bold;
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>VM Lua Obfuscator (Web Edition)</h1>
+    
+    <div class="section">
+      <p class="label">Enter Lua instructions (simple format)</p>
+      <p>Supported instructions right now:</p>
+      <ul>
+        <li>push_int 123</li>
+        <li>push_str "hello"</li>
+        <li>add / sub / mul</li>
+        <li>print</li>
+        <li>halt</li>
+      </ul>
+      <textarea id="inputInstructions" placeholder="Enter instructions one per line... e.g.:
+push_int 777
+push_int 333
+add
+print
+halt"></textarea>
+    </div>
+
+    <div class="section">
+      <button onclick="obfuscate()">Obfuscate Now!</button>
+      <button onclick="document.getElementById('output').textContent = ''">Clear Result</button>
+    </div>
+
+    <div class="section">
+      <p class="label">Obfuscated Lua VM Code (copy & paste ready)</p>
+      <pre id="output">Click Obfuscate to start...</pre>
+    </div>
+
+    <div class="section">
+      <p class="label">Debug Info</p>
+      <pre id="debugInfo"></pre>
+    </div>
+  </div>
+
+  <script>
+    // ==================== Generate random opcodes every time ====================
+    function generateRandomOpcodes() {
+      const names = ['PUSH_INT', 'PUSH_STR', 'ADD', 'SUB', 'MUL', 'PRINT', 'POP', 'HALT'];
+      const used = new Set();
+      const mapping = {};
+
+      names.forEach(name => {
+        let val;
+        do {
+          val = Math.floor(Math.random() * 206) + 50; // 50-255
+        } while (used.has(val));
+        used.add(val);
+        mapping[name] = val;
+      });
+
+      return mapping;
+    }
+
+    // ==================== Generate bytecode from instructions ====================
+    function generateBytecode(instructions, opcodes) {
+      const bytecode = [];
+      const stringPool = [];
+      const stringIndices = {};
+
+      instructions.forEach(line => {
+        line = line.trim();
+        if (!line) return;
+
+        // Insert random junk instruction
+        if (Math.random() < 0.35) {
+          bytecode.push(Math.floor(Math.random() * 256));
+        }
+
+        const parts = line.split(/\s+/);
+        const cmd = parts[0].toLowerCase();
+
+        if (cmd === 'push_int') {
+          const num = parseInt(parts[1]);
+          bytecode.push(opcodes['PUSH_INT']);
+          bytecode.push(num & 0xFF);
+          bytecode.push((num >> 8) & 0xFF);
+        } 
+        else if (cmd === 'push_str') {
+          const str = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
+          if (!(str in stringIndices)) {
+            stringIndices[str] = stringPool.length;
+            stringPool.push(str);
+          }
+          bytecode.push(opcodes['PUSH_STR']);
+          bytecode.push(stringIndices[str]);
+        } 
+        else if (['add','sub','mul','print','pop','halt'].includes(cmd)) {
+          const upper = cmd.toUpperCase();
+          if (upper in opcodes) {
+            bytecode.push(opcodes[upper]);
+          }
+        }
+      });
+
+      // Always end with HALT
+      bytecode.push(opcodes['HALT']);
+      return { bytecode, stringPool };
+    }
+
+    // ==================== Encrypt bytecode (XOR + random junk) ====================
+    const XOR_KEY = Math.floor(Math.random() * 91) + 30; // 30-120
+
+    function encryptBytecode(bc) {
+      const encrypted = [];
+      bc.forEach(b => {
+        encrypted.push(b ^ XOR_KEY);
+        if (Math.random() < 0.25) {
+          encrypted.push(Math.floor(Math.random() * 256)); // junk byte
+        }
+      });
+      return encrypted;
+    }
+
+    // ==================== Generate fake VM sections ====================
+    function generateFakeVMs(count = 4) {
+      const fakes = [];
+      for (let i = 0; i < count; i++) {
+        const size = Math.floor(Math.random() * 23) + 8;
+        const section = Array(size).fill(0).map(() => Math.floor(Math.random() * 256));
+        fakes.push(section);
+      }
+      return fakes;
+    }
+
+    // ==================== Generate final Lua VM code ====================
+    function generateLuaVM(opcodes, encrypted, fakes) {
+      const opcodesStr = Object.entries(opcodes)
+        .map(([k, v]) => `['${k}'] = ${v}`)
+        .join(',\n    ');
+
+      const fakeStr = fakes.map(arr => `{${arr.join(',')}}`).join(',\n    ');
+
+      const bytecodeStr = `{${encrypted.join(',')}}`;
+
+      return `-- VM Obfuscated Code
+local KEY = ${XOR_KEY}
+local OPCODES = {
+    ${opcodesStr}
+}
+
+local function run(enc)
+    local bc = {}
+    for i = 1, #enc do
+        bc[i] = bit32.bxor(enc[i], KEY)
+    end
+    
+    local stack = {}
+    local pc = 1
+    
+    while pc <= #bc do
+        local op = bc[pc]; pc = pc + 1
+        
+        if op == OPCODES['PUSH_INT'] then
+            local lo = bc[pc]; pc = pc + 1
+            local hi = bc[pc]; pc = pc + 1
+            table.insert(stack, lo + hi * 256)
+        elseif op == OPCODES['PRINT'] then
+            print(table.remove(stack))
+        -- Add other handlers as needed
+        elseif op == OPCODES['HALT'] then
+            break
+        end
+        
+        -- Anti-analysis: random skip
+        if math.random() < 0.12 then
+            pc = pc + math.random(1,4)
+        end
+    end
+end
+
+-- Fake sections to confuse reverse engineers
+local fakes = {
+    ${fakeStr}
+}
+
+for _,f in ipairs(fakes) do
+    local _ = f[math.random(1, #f)]
+end
+
+-- Execute real code
+run(${bytecodeStr})
+`;
+    }
+
+    // ==================== Main obfuscate function ====================
+    function obfuscate() {
+      const input = document.getElementById('inputInstructions').value;
+      const lines = input.split('\n').map(l => l.trim()).filter(Boolean);
+
+      if (lines.length === 0) {
+        alert("Please enter some instructions first!");
+        return;
+      }
+
+      const opcodes = generateRandomOpcodes();
+      const { bytecode, stringPool } = generateBytecode(lines, opcodes);
+      const encrypted = encryptBytecode(bytecode);
+      const fakes = generateFakeVMs();
+
+      const result = generateLuaVM(opcodes, encrypted, fakes);
+
+      document.getElementById('output').textContent = result;
+
+      // Show debug info
+      document.getElementById('debugInfo').textContent = 
+        `XOR Key: ${XOR_KEY}\n` +
+        `String Pool:\n\( {stringPool.map((s,i) => `[ \){i}] "${s}"`).join('\n')}`;
+    }
+  </script>
+</body>
+</html>    }
     button {
       background: #6366f1;
       border: none;
