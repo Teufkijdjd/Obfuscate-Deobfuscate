@@ -8,7 +8,7 @@ AI code reading ❌
 String dump ❌ 
 Table dump ❌ 
 Beautify ❌
-https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/Java%20Obfuscate%20Luau%20Cobe
+https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/HTML%20Obfuscate%20Luau%20Cobe
 # Deobfuscate Code HTML
 Roblox-specific capabilities: 
 Decode \ddd \x \u{} (Luau compatible) ✅
@@ -19,4 +19,4 @@ Detect Custom VM Roblox ✅
 Detect Anti-debug / Anti-dump ✅
 Inline getfenv, _ENV, setfenv trick✅ 
 Luau-safe (does not break syntax) ✅
-https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/Java%20Deobfuscate%20Luau%20Code
+https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/HTML%20Deobfuscate%20Luau%20Code
