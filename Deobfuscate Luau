@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Roblox Luau Extreme Deobfuscator</title>
+<style>
+body{background:#060606;color:#00ff88;font-family:monospace}
+textarea{width:100%;height:230px;background:#000;color:#0f0;border:1px solid #222;padding:8px}
+button{background:#111;color:#0ff;border:1px solid #333;padding:10px;margin:6px}
+button:hover{background:#222}
+</style>
+</head>
+<body>
+
+<h2>🤖 Roblox Luau EXTREME Deobfuscator</h2>
+
+<textarea id="in" placeholder="Paste Roblox obfuscated Luau here"></textarea>
+<button onclick="run()">💥 DEOBF ROBLOX</button>
+<textarea id="out" placeholder="Deobfuscated output"></textarea>
+
+<script>
+// ========= Core Utils =========
+const chr = String.fromCharCode;
+
+function decodeEsc(s){
+ return s
+  .replace(/\\x([0-9a-f]{2})/gi,(_,h)=>chr(parseInt(h,16)))
+  .replace(/\\([0-9]{1,3})/g,(_,d)=>chr(+d))
+  .replace(/\\u\{([0-9a-f]+)\}/gi,(_,h)=>chr(parseInt(h,16)));
+}
+
+function base64(s){
+ try{
+  if(/^[A-Za-z0-9+/=]+$/.test(s)&&s.length%4===0)
+   return atob(s);
+ }catch{}
+ return s;
+}
+
+function xorAuto(s){
+ for(let k=1;k<256;k++){
+  let o="";
+  for(let c of s)o+=chr(c.charCodeAt(0)^k);
+  if(/game:GetService|Instance\.new|LocalPlayer|function/.test(o))
+   return o;
+ }
+ return s;
+}
+
+// ========= String Table =========
+function extractTables(code){
+ let t={};
+ code.replace(/local\s+(\w+)\s*=\s*\{([\s\S]*?)\}/g,(m,n,b)=>{
+  let a=[];
+  b.replace(/"(.*?)"/g,(_,s)=>a.push(decodeEsc(s)));
+  if(a.length>0)t[n]=a;
+ });
+ return t;
+}
+
+function inlineTables(code,t){
+ for(let k in t){
+  t[k].forEach((v,i)=>{
+   code=code.replace(
+    new RegExp(`${k}\\s*\\[\\s*${i+1}\\s*\\]`,'g'),
+    `"${v}"`
+   );
+  });
+ }
+ return code;
+}
+
+// ========= Anti / Flow =========
+function killFakeLoops(c){
+ return c.replace(/while\s+true\s+do([\s\S]*?)end/g,(m,b)=>{
+  if(!/break|return|wait/.test(b))return b;
+  return m;
+ });
+}
+
+function killAnti(c){
+ return c
+  .replace(/if\s+not\s+syn\s+then[\s\S]*?end/g,"")
+  .replace(/if\s+not\s+debug\s+then[\s\S]*?end/g,"")
+  .replace(/pcall\s*\(function\(\)[\s\S]*?end\)/g,"");
+}
+
+// ========= VM Detect =========
+function detectVM(c){
+ let s=0;
+ if(/while\s+true\s+do/.test(c))s++;
+ if(/pc\s*=|opcode|instr|stack/.test(c))s++;
+ if(/table\.remove|table\.insert/.test(c))s++;
+ if(/math\.floor\(pc/.test(c))s++;
+ return s>=2;
+}
+
+// ========= Const Fold =========
+function fold(c){
+ return c.replace(/(\d+)\s*([\+\-\*\/])\s*(\d+)/g,(m,a,o,b)=>{
+  try{return eval(a+o+b)}catch{return m}
+ });
+}
+
+// ========= RUN =========
+function run(){
+ let c=document.getElementById("in").value;
+
+ // PASS 1 decode escapes
+ c=decodeEsc(c);
+
+ // PASS 2 string decode
+ c=c.replace(/"([^"]{6,})"/g,(m,s)=>{
+  let d=base64(s);
+  if(d!==s)return `"${d}"`;
+  let x=xorAuto(s);
+  if(x!==s)return `"${x}"`;
+  return m;
+ });
+
+ // PASS 3 string tables
+ let t=extractTables(c);
+ c=inlineTables(c,t);
+
+ // PASS 4 anti + flow
+ c=killAnti(c);
+ c=killFakeLoops(c);
+
+ // PASS 5 constant fold
+ c=fold(c);
+
+ // VM header
+ if(detectVM(c)) c="-- ⚠ ROBLOX CUSTOM VM DETECTED\n-- Manual opcode reversing required\n\n"+c;
+
+ document.getElementById("out").value=c;
+}
+</script>
+</body>
+</html>
