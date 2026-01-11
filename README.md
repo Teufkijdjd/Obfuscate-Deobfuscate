@@ -8,7 +8,7 @@ AI code reading ❌
 String dump ❌ 
 Table dump ❌ 
 Beautify ❌
-https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/README.md
+https://github.com/Teufkijdjd/Obfuscate-Deobfuscate/blob/main/Java%20Obfuscate%20Luau%20Cobe
 # Deobfuscate Code HTML
 Roblox-specific capabilities: 
 Decode \ddd \x \u{} (Luau compatible) ✅
