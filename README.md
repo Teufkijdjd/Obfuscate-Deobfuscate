@@ -1,4 +1,4 @@
-# HTML + JavaScript obfuscate 
+# Obfuscate Code Free make by Neczx
 [+]VM
 [+] Opcode random
 [+] Encrypted bytecode
