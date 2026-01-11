@@ -1,0 +1,94 @@
+import re
+
+INPUT  = "obf.lua"
+OUTPUT = "deobf.lua"
+
+# ---------------- BIT OPS ----------------
+def ror(v, r): return ((v >> r) | (v << (8 - r))) & 0xFF
+def rol(v, r): return ((v << r) | (v >> (8 - r))) & 0xFF
+
+# ---------------- LOAD ----------------
+with open(INPUT, "r", encoding="utf-8", errors="ignore") as f:
+    src = f.read()
+
+# ---------------- FIND STRING POOLS ----------------
+# รองรับหลายรูปแบบ ไม่ fix โครง
+pool_regex = re.compile(
+    r"\{[^{}]*\{([\d,\s]+)\}[^{}]*\}"
+)
+
+number_tables = []
+for m in pool_regex.finditer(src):
+    nums = [int(x) for x in m.group(1).split(",") if x.strip()]
+    if len(nums) > 3:
+        number_tables.append(nums)
+
+print(f"[+] Numeric tables detected: {len(number_tables)}")
+
+# ---------------- DETECT DECODER FUNCTION ----------------
+# heuristic: function ที่ใช้ char + math + loop
+decoder_funcs = re.findall(
+    r"local function (\w+)\(.*?\)(.*?)end",
+    src,
+    flags=re.S
+)
+
+print(f"[+] Functions scanned: {len(decoder_funcs)}")
+
+# ---------------- EMULATE COMMON DECODER ----------------
+def emulate_decoder(data):
+    # brute-try common patterns
+    for r in range(1,8):
+        for n in range(0,20):
+            out = ""
+            ok = True
+            for i,d in enumerate(data, start=1):
+                c = d
+                c = (c - (i % 7)) & 0xFF
+                c = ror(c, r)
+                c = (c - n) & 0xFF
+                if c < 9 or c > 126:
+                    ok = False
+                    break
+                out += chr(c)
+            if ok and out.count("\x00") == 0:
+                return out
+    return None
+
+decoded_strings = []
+for tbl in number_tables:
+    s = emulate_decoder(tbl)
+    if s:
+        decoded_strings.append(s)
+
+print(f"[+] Strings decoded: {len(decoded_strings)}")
+
+# ---------------- INLINE STRING CALLS ----------------
+def replace_call(m):
+    idx = int(m.group(1))
+    if idx < len(decoded_strings):
+        return '"' + decoded_strings[idx].replace('"','\\"') + '"'
+    return m.group(0)
+
+src = re.sub(r"\b\w+\((\d+)\)", replace_call, src)
+
+# ---------------- REMOVE DECODE INFRA ----------------
+patterns = [
+    r"local function\s+\w+.*?end",
+    r"local\s+\w+\s*=\s*\{.*?\}",
+    r"do\s+.*?end",
+    r"while\s+true\s+do.*?end",
+]
+
+for p in patterns:
+    src = re.sub(p, "", src, flags=re.S)
+
+# ---------------- CLEAN FLOW ----------------
+src = re.sub(r"\belseif\b", "else", src)
+src = re.sub(r"\bend\s*end\b", "end", src)
+
+# ---------------- SAVE ----------------
+with open(OUTPUT, "w", encoding="utf-8") as f:
+    f.write(src)
+
+print("[+] DONE -> deobf.lua")
